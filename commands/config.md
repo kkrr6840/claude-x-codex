@@ -8,14 +8,26 @@ allowed-tools: Bash
 
 $ARGUMENTS
 
-配置工具是 `"${CLAUDE_PLUGIN_ROOT}/scripts/ctl.sh"`，请按以下步骤处理：
+配置工具是 `"${CLAUDE_PLUGIN_ROOT}/scripts/ctl.sh"`。
 
-1. **安全检查优先**：如果参数里出现疑似 API 密钥（如 sk- 开头的长字符串），**不要写入任何配置**，立刻停止并提醒用户——密钥贴进会话会留在对话记录里。让用户在另开的终端窗口执行：
-   ```
-   printf '%s' '<你的KEY>' > ~/.claude/codex-offload/token && chmod 600 ~/.claude/codex-offload/token
-   ```
-   （或运行 `"${CLAUDE_PLUGIN_ROOT}/scripts/ctl.sh" set-token` 交互式输入，不回显。）
-2. 对每个 `key=value` 形式的参数，运行 `ctl.sh set <key> <value>`。支持的 key：`base_url`、`model`、`level`（balanced=只分流 subagent 类子任务｜high=能分流的一律分流，含主线编码）、`wire_api`（默认 responses；新版 codex 已移除 chat 支持，中转商必须支持 Responses API）、`sandbox`（read-only|workspace-write）、`timeout`（秒）。如果用户只给了一个裸 URL（没写 key=），按 base_url 处理。
-   注意：设置 `level` 后除了运行脚本，还要在本会话内**立即按新强度执行**（high=能分流的一律分流；balanced=只分流 subagent 类子任务）。
-3. 如果没有给任何参数，运行 `ctl.sh status` 展示当前配置，并告诉用户本命令的用法。
-4. 全部设置完后运行 `ctl.sh status` 把最终配置给用户，并建议运行 /codex-offload:test 验证连通性。
+**安全红线（两种模式通用）**：密钥绝不通过命令参数或会话消息写入配置。如果参数或用户消息里出现疑似 API 密钥（如 sk- 开头的长字符串），不要用它写任何文件，提醒用户：密钥已留在会话记录里，建议之后到中转商后台作废换新；正确做法是在**另开的终端窗口**执行：
+```
+printf '%s' '<你的KEY>' > ~/.claude/codex-offload/token && chmod 600 ~/.claude/codex-offload/token
+```
+
+## 模式一：带参数（快速设置）
+
+对每个 `key=value` 形式的参数，运行 `ctl.sh set <key> <value>`。支持的 key：`base_url`、`model`、`level`（balanced=只分流 subagent 类子任务｜high=能分流的一律分流，含主线编码）、`wire_api`（默认 responses；新版 codex 已移除 chat 支持，中转商必须支持 Responses API）、`sandbox`（read-only|workspace-write）、`timeout`（秒）。如果用户只给了一个裸 URL（没写 key=），按 base_url 处理。设置 `level` 后要在本会话内立即按新强度执行。全部设置完运行 `ctl.sh status` 展示结果，建议用户跑 /codex-offload:test。
+
+## 模式二：不带参数（引导式配置）
+
+$ARGUMENTS 为空时，逐步引导用户完成配置：
+
+1. 先运行 `ctl.sh status` 展示当前配置，已配好的项告诉用户可以直接沿用。
+2. **base_url**：问用户中转商的接口地址（自由输入；提醒一般以 `/v1` 结尾，且中转商必须支持 Responses API 即 `/v1/responses` 端点）。
+3. **model**：用 AskUserQuestion 给选项（如 gpt-5、gpt-5-codex，以中转商实际支持为准）并允许自填。
+4. **level**：用 AskUserQuestion 二选一——balanced（默认：只分流搜索/分析/调研类子任务，质量优先）或 high（激进：能分流的一律分流含主线编码，省 token 优先）。
+5. wire_api / sandbox / timeout 是高级项，不主动问，用户提到才设。
+6. 每拿到一个值就执行 `ctl.sh set <key> <value>` 落盘。
+7. **token 环节**：用 `test -f ~/.claude/codex-offload/token && echo 已配置 || echo 未配置` 检查（**绝不 cat 该文件内容**）。未配置就把上面安全红线里的 printf 命令给用户，让其在另开的终端执行，等用户回复完成后再检查一次确认。
+8. 收尾：运行 `ctl.sh status` 展示最终配置；问用户是否现在开启分流（是则运行 `ctl.sh enable`）并建议跑 /codex-offload:test 验证连通性。
