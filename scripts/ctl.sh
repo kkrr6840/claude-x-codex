@@ -107,6 +107,37 @@ case "$cmd" in
     chmod 600 "$TOKEN_FILE"
     echo "token 已保存到 $TOKEN_FILE (权限 0600)"
     ;;
+  models)
+    [ -n "$BASE_URL" ] || { echo "先配置 base_url (ctl.sh set base_url <url>)" >&2; exit 1; }
+    [ -f "$TOKEN_FILE" ] || { echo "先配置 token ($TOKEN_FILE)" >&2; exit 1; }
+    python3 - "$BASE_URL" "$TOKEN_FILE" <<'PY'
+import json, sys, urllib.request, urllib.error
+
+base, token_file = sys.argv[1].rstrip("/"), sys.argv[2]
+with open(token_file) as f:
+    token = f.read().strip()
+req = urllib.request.Request(base + "/models",
+                             headers={"Authorization": "Bearer " + token})
+try:
+    with urllib.request.urlopen(req, timeout=20) as r:
+        data = json.load(r)
+except urllib.error.HTTPError as e:
+    print(f"获取模型列表失败: HTTP {e.code} {e.reason}", file=sys.stderr)
+    sys.exit(1)
+except Exception as e:
+    print(f"获取模型列表失败: {e}", file=sys.stderr)
+    sys.exit(1)
+
+items = data.get("data") if isinstance(data, dict) else data
+if not isinstance(items, list):
+    items = []
+ids = sorted({m.get("id") for m in items if isinstance(m, dict) and m.get("id")})
+if not ids:
+    print("接口没有返回模型列表(中转商可能不支持 /models 端点)", file=sys.stderr)
+    sys.exit(1)
+print("\n".join(ids))
+PY
+    ;;
   status)
     if [ "${ENABLED:-0}" = "1" ]; then sw="ON"; else sw="OFF"; fi
     echo "开关:     $sw"
@@ -128,7 +159,7 @@ case "$cmd" in
     fi
     ;;
   *)
-    echo "用法: ctl.sh {enable|disable|status|set <key> <val>|set-token}" >&2
+    echo "用法: ctl.sh {enable|disable|status|set <key> <val>|set-token|models}" >&2
     exit 1
     ;;
 esac

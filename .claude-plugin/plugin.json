@@ -1,6 +1,6 @@
 {
   "name": "codex-offload",
-  "version": "0.1.1",
+  "version": "0.1.2",
   "displayName": "Codex Offload",
   "description": "把自包含子任务分流给本地 codex CLI（第三方中转商）执行，节省 Claude token",
   "author": {

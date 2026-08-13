@@ -21,13 +21,14 @@ printf '%s' '<你的KEY>' > ~/.claude/codex-offload/token && chmod 600 ~/.claude
 
 ## 模式二：不带参数（引导式配置）
 
-$ARGUMENTS 为空时，逐步引导用户完成配置：
+$ARGUMENTS 为空时，逐步引导用户完成配置（顺序有讲究：先配好 base_url 和 token，才能拉取真实模型列表供选择）：
 
 1. 先运行 `ctl.sh status` 展示当前配置，已配好的项告诉用户可以直接沿用。
-2. **base_url**：问用户中转商的接口地址（自由输入；提醒一般以 `/v1` 结尾，且中转商必须支持 Responses API 即 `/v1/responses` 端点）。
-3. **model**：用 AskUserQuestion 给选项（如 gpt-5、gpt-5-codex，以中转商实际支持为准）并允许自填。
-4. **level**：用 AskUserQuestion 二选一——balanced（默认：只分流搜索/分析/调研类子任务，质量优先）或 high（激进：能分流的一律分流含主线编码，省 token 优先）。
-5. wire_api / sandbox / timeout 是高级项，不主动问，用户提到才设。
-6. 每拿到一个值就执行 `ctl.sh set <key> <value>` 落盘。
-7. **token 环节**：用 `test -f ~/.claude/codex-offload/token && echo 已配置 || echo 未配置` 检查（**绝不 cat 该文件内容**）。未配置就把上面安全红线里的 printf 命令给用户，让其在另开的终端执行，等用户回复完成后再检查一次确认。
-8. 收尾：运行 `ctl.sh status` 展示最终配置；问用户是否现在开启分流（是则运行 `ctl.sh enable`）并建议跑 /codex-offload:test 验证连通性。
+2. **base_url**：问用户中转商的接口地址（自由输入；提醒一般以 `/v1` 结尾，且中转商必须支持 Responses API 即 `/v1/responses` 端点）。拿到后 `ctl.sh set base_url <url>`。
+3. **token**：用 `test -f ~/.claude/codex-offload/token && echo 已配置 || echo 未配置` 检查（**绝不 cat 该文件内容**）。未配置就把安全红线里的 printf 命令给用户，让其在另开的终端执行，等用户回复完成后再检查一次确认。
+4. **model（从真实列表里选，不让用户盲填）**：运行 `ctl.sh models` 拉取中转商实际支持的模型列表。
+   - 成功：优先筛选适合编码任务的模型（gpt-5 系 / codex 系 / o 系），用 AskUserQuestion 给出最多 4 个推荐选项让用户选（用户也可通过 Other 自填）；如果列表很长，同时把完整列表（或按前缀归组的摘要）展示出来供参考。选定后 `ctl.sh set model <id>`。
+   - 失败（如中转商不支持 /models）：告知原因，回退为自由输入。
+5. **level**：用 AskUserQuestion 二选一——balanced（默认：只分流搜索/分析/调研类子任务，质量优先）或 high（激进：能分流的一律分流含主线编码，省 token 优先）。
+6. wire_api / sandbox / timeout 是高级项，不主动问，用户提到才设。
+7. 收尾：运行 `ctl.sh status` 展示最终配置；问用户是否现在开启分流（是则运行 `ctl.sh enable`）并建议跑 /codex-offload:test 验证连通性。
