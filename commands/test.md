@@ -3,7 +3,10 @@ description: 用最小任务验证中转商连通性（base_url / token / wire_a
 allowed-tools: Bash
 ---
 
-运行连通性自检：`bash "${CLAUDE_PLUGIN_ROOT}/scripts/codex-run.sh" --test`（Bash 工具的 timeout 参数给到 180000 毫秒，自检可能需要 1-2 分钟）。
+运行连通性自检（工具的 timeout 参数给到 180000 毫秒，自检可能需要 1-2 分钟）：
+
+- 有 Bash 工具：`bash "${CLAUDE_PLUGIN_ROOT}/scripts/codex-run.sh" --test`
+- 只有 PowerShell 工具（未装 Git Bash 的 Windows）：`& "${CLAUDE_PLUGIN_ROOT}/scripts/codex-run.ps1" -Test`
 
 - **成功**（stdout 含 ok）：告诉用户配置可用，可以开始分流。
 - **失败**：把 stderr 里的关键错误行给用户看，并按常见原因给排查建议：

@@ -8,7 +8,7 @@ allowed-tools: Bash
 
 $ARGUMENTS
 
-执行方式：`bash "${CLAUDE_PLUGIN_ROOT}/scripts/codex-run.sh" --cd <合适的工作目录> '<任务描述>'`。要点：
+执行方式：`bash "${CLAUDE_PLUGIN_ROOT}/scripts/codex-run.sh" --cd <合适的工作目录> '<任务描述>'`；本环境只有 PowerShell 工具（未装 Git Bash 的 Windows）时用 `& "${CLAUDE_PLUGIN_ROOT}/scripts/codex-run.ps1" -Cd <目录> '<任务描述>'`。要点：
 
 1. 任务描述必须**自包含**——codex 看不到本会话，必要时把背景信息补写进描述里；同时要求 codex 返回精炼结论，不要大段粘贴文件内容。
 2. 默认只读沙箱。只有任务明确需要修改文件时才加 `--sandbox workspace-write`，完成后用 `git diff` 复核改动，复核通过再向用户汇报。

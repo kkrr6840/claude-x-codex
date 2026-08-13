@@ -5,7 +5,11 @@
         "hooks": [
           {
             "type": "command",
-            "command": "\"${CLAUDE_PLUGIN_ROOT}\"/scripts/session-start.sh"
+            "command": "bash \"${CLAUDE_PLUGIN_ROOT}/scripts/session-start.sh\""
+          },
+          {
+            "type": "command",
+            "command": "powershell.exe -NoProfile -ExecutionPolicy Bypass -File \"${CLAUDE_PLUGIN_ROOT}/scripts/session-start.ps1\""
           }
         ]
       }

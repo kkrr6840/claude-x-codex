@@ -27,8 +27,10 @@ MODEL="gpt-5"
 WIRE_API="responses"
 SANDBOX_DEFAULT="read-only"
 TIMEOUT_DEFAULT=600
-# shellcheck disable=SC1090
-[ -f "$CFG_FILE" ] && . "$CFG_FILE"
+# tr 去 \r 容忍 CRLF config;用 eval 而非 . <(...)(进程替换在受限环境会静默失败),与 ctl.sh 一致
+if [ -f "$CFG_FILE" ]; then
+  eval "$(tr -d '\r' < "$CFG_FILE")"
+fi
 
 WORKDIR="$PWD"
 SANDBOX="$SANDBOX_DEFAULT"
@@ -67,22 +69,31 @@ case "$SANDBOX" in
   read-only|workspace-write) ;;
   *) die "sandbox 只能是 read-only 或 workspace-write" ;;
 esac
+case "$TIMEOUT" in
+  ''|*[!0-9]*) die "timeout 必须是秒数(纯数字): $TIMEOUT" ;;
+esac
 [ -d "$WORKDIR" ] || die "工作目录不存在: $WORKDIR"
 
-# 超时包装: 优先 timeout/gtimeout,都没有就不限时(由调用方兜底)
+# 超时包装: 只认 GNU timeout(--version 能跑通)。
+# 注意 Windows 自带的 System32 timeout.exe 是"等待N秒"命令,语义完全不同,必须排除
 TIMEOUT_BIN=""
-if command -v timeout >/dev/null 2>&1; then
-  TIMEOUT_BIN="timeout"
-elif command -v gtimeout >/dev/null 2>&1; then
-  TIMEOUT_BIN="gtimeout"
-fi
+for cand in timeout gtimeout; do
+  if command -v "$cand" >/dev/null 2>&1 && "$cand" --version >/dev/null 2>&1; then
+    TIMEOUT_BIN="$cand"
+    break
+  fi
+done
 
 OUT="$(mktemp -t codex-offload-out.XXXXXX)"
 LOG="$(mktemp -t codex-offload-log.XXXXXX)"
 trap 'rm -f "$OUT"' EXIT
 
+# token 去 \r\n(容忍 Windows 工具写出的 CRLF token 文件),空 token 提前拦截
+RELAY_KEY="$(tr -d '\r\n' < "$TOKEN_FILE")"
+[ -n "$RELAY_KEY" ] || die "token 文件为空: $TOKEN_FILE"
+
 set +e
-RELAY_API_KEY="$(cat "$TOKEN_FILE")" \
+RELAY_API_KEY="$RELAY_KEY" \
 ${TIMEOUT_BIN:+"$TIMEOUT_BIN" "$TIMEOUT"} \
 codex exec \
   -c 'model_providers.relay.name="relay"' \
@@ -101,6 +112,12 @@ rc=$?
 set -e
 
 if [ "$rc" -eq 0 ]; then
+  if [ ! -s "$OUT" ]; then
+    # 防御: codex 在管道/无 TTY 环境(尤其 Windows Git Bash)有静默退出无输出的已知问题(openai/codex#19945)
+    echo "codex-run: codex 退出码 0 但没有产出结果。若在 Windows Git Bash 环境,这是 codex 的已知问题(openai/codex#19945),请改用 PowerShell 环境(codex-run.ps1)或 WSL" >&2
+    echo "codex-run: 完整日志: $LOG" >&2
+    exit 1
+  fi
   cat "$OUT"
   echo
   rm -f "$LOG"

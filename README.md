@@ -6,9 +6,9 @@ Claude Code 插件：把自包含子任务分流给本地 **codex CLI**（走第
 
 ## 前置条件
 
-- 已安装 [codex CLI](https://github.com/openai/codex)：`brew install codex` 或 `npm i -g @openai/codex`
-- 一个 OpenAI 兼容中转商的 base_url 和 API key
-- macOS / Linux（脚本为 bash，Windows 未适配）
+- 已安装 [codex CLI](https://github.com/openai/codex)：macOS 用 `brew install codex`，跨平台用 `npm i -g @openai/codex`，Windows 也可用官方脚本 `powershell -ExecutionPolicy ByPass -c "irm https://chatgpt.com/codex/install.ps1 | iex"`
+- 一个支持 **Responses API**（`/v1/responses` 端点）的 OpenAI 兼容中转商 base_url 和 API key
+- macOS / Linux / Windows（Windows 详见下方"Windows 支持"）
 
 ## 安装
 
@@ -75,6 +75,33 @@ high 模式省得更多，但依赖复核兜底——codex 的每次文件改动
 1. **SessionStart hook**（`scripts/session-start.sh`）：仅当开关为 ON 时向新会话注入分流指引；
 2. **`:on` / `:off` 命令正文**：让当前会话立即改变行为（hook 只在会话启动时跑一次）；
 3. **`scripts/codex-run.sh` 硬检查**：开关 OFF 时直接拒绝执行——关了就是关了。
+
+## Windows 支持
+
+插件在 Windows 上是双轨的，自动适配：
+
+| 环境 | 用哪套脚本 | 说明 |
+|---|---|---|
+| 装了 Git for Windows（**推荐**，Claude Code 的 Bash 工具本身也需要它） | 与 mac/Linux 相同的 `scripts/*.sh` | hooks 和 `!` 预处理默认走 Git Bash |
+| 纯 PowerShell（未装 Git Bash） | 孪生脚本 `scripts/*.ps1`（PowerShell 5.1 兼容） | hooks 自动落到 PowerShell 条目，命令/技能里也给了对应调用方式 |
+
+两套脚本共用同一份配置（`%USERPROFILE%\.claude\codex-offload\`），行为一致。token 写入（PowerShell）：
+
+```powershell
+New-Item -ItemType Directory -Force "$env:USERPROFILE\.claude\codex-offload" | Out-Null
+[IO.File]::WriteAllText("$env:USERPROFILE\.claude\codex-offload\token", '<你的KEY>')
+```
+
+**⚠️ 原生 Windows 的 codex 沙箱是实验性且默认关闭的**。不开沙箱时 `codex exec` 在 read-only 下只能执行已知安全的只读命令，其余一律被拒——分流的能力会大打折扣，写任务（workspace-write）基本不可用。两个解法：
+
+1. 在 `%USERPROFILE%\.codex\config.toml` 里启用官方实验性沙箱：
+   ```toml
+   [windows]
+   sandbox = "elevated"
+   ```
+2. 或用 WSL2（内部走成熟的 Linux 沙箱，本插件按 Linux 路径工作，体验最好）。
+
+已知上游坑：Git Bash 管道里调 `codex exec` 可能静默退出无输出（openai/codex#19945）——脚本已加检测，遇到会明确报错并建议换 PowerShell/WSL。
 
 ## 安全设计
 

@@ -5,8 +5,10 @@ set -u
 CFG_DIR="${CODEX_OFFLOAD_HOME:-$HOME/.claude/codex-offload}"
 ENABLED=0
 LEVEL="balanced"
-# shellcheck disable=SC1090
-[ -f "$CFG_DIR/config" ] && . "$CFG_DIR/config"
+# tr 去 \r 容忍 CRLF config;用 eval 而非 . <(...)(进程替换在受限环境会静默失败),与 ctl.sh 一致
+if [ -f "$CFG_DIR/config" ]; then
+  eval "$(tr -d '\r' < "$CFG_DIR/config")"
+fi
 
 [ "${ENABLED:-0}" = "1" ] || exit 0
 
@@ -24,13 +26,15 @@ ctx="codex-offload 分流已开启。$policy
 规则: 1) 任务描述必须自包含,codex 看不到本会话; 2) 要求 codex 返回精炼结论,不要大段文件转储; 3) 默认只读沙箱,确需写文件才加 --sandbox workspace-write,完成后必须复核改动; 4) 并行写文件用 git worktree 隔离; 5) 需要会话上下文、需要 MCP/浏览器等专属工具、或属于关键决策的任务不分流。
 首次分流前先读 codex-offload 插件的 skill 获取完整规则。用户用 /codex-offload:off 关闭后立即停止分流。"
 
-python3 - "$ctx" <<'PY'
-import json, sys
-ctx = sys.argv[1]
-print(json.dumps({
-    "hookSpecificOutput": {
-        "hookEventName": "SessionStart",
-        "additionalContext": ctx,
-    }
-}, ensure_ascii=False))
-PY
+# 纯 bash JSON 转义(ctx 是脚本自控文案,覆盖 \ " 换行 制表符即可;不依赖 python3,Git Bash 里也能跑)
+json_escape() {
+  local s=$1
+  s=${s//\\/\\\\}
+  s=${s//\"/\\\"}
+  s=${s//$'\r'/}
+  s=${s//$'\t'/\\t}
+  s=${s//$'\n'/\\n}
+  printf '%s' "$s"
+}
+
+printf '{"hookSpecificOutput":{"hookEventName":"SessionStart","additionalContext":"%s"}}\n' "$(json_escape "$ctx")"

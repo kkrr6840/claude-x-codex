@@ -8,11 +8,16 @@ allowed-tools: Bash
 
 $ARGUMENTS
 
-配置工具是 `"${CLAUDE_PLUGIN_ROOT}/scripts/ctl.sh"`。
+配置工具是 `"${CLAUDE_PLUGIN_ROOT}/scripts/ctl.sh"`（有 Bash 工具时）；本环境只有 PowerShell 工具（未装 Git Bash 的 Windows）时，改用 `& "${CLAUDE_PLUGIN_ROOT}/scripts/ctl.ps1"`，子命令与参数完全相同，下文的 `ctl.sh` 均按此替换。
 
 **安全红线（两种模式通用）**：密钥绝不通过命令参数或会话消息写入配置。如果参数或用户消息里出现疑似 API 密钥（如 sk- 开头的长字符串），不要用它写任何文件，提醒用户：密钥已留在会话记录里，建议之后到中转商后台作废换新；正确做法是在**另开的终端窗口**执行：
 ```
+# macOS / Linux / Git Bash:
 printf '%s' '<你的KEY>' > ~/.claude/codex-offload/token && chmod 600 ~/.claude/codex-offload/token
+
+# Windows PowerShell:
+New-Item -ItemType Directory -Force "$env:USERPROFILE\.claude\codex-offload" | Out-Null
+[IO.File]::WriteAllText("$env:USERPROFILE\.claude\codex-offload\token", '<你的KEY>')
 ```
 
 ## 模式一：带参数（快速设置）

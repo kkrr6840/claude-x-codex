@@ -17,21 +17,26 @@ TIMEOUT_DEFAULT=600
 LEVEL="balanced"
 
 load() {
-  # shellcheck disable=SC1090
-  [ -f "$CFG_FILE" ] && . "$CFG_FILE" || true
+  # tr 去 \r: 容忍被 Windows 编辑器改成 CRLF 的 config(否则值尾带 \r 静默出错)。
+  # 用 eval 而不是 . <(...): 进程替换依赖 /dev/fd,在部分受限环境(沙箱/精简 Git Bash)会静默失败
+  if [ -f "$CFG_FILE" ]; then
+    eval "$(tr -d '\r' < "$CFG_FILE")"
+  fi
 }
 
 save() {
   mkdir -p "$CFG_DIR"
   chmod 700 "$CFG_DIR"
+  # 写不带引号的纯 KEY=value(值已由 set 校验为无特殊字符):
+  # 保证 PowerShell 孪生脚本能按字面读取,不要改回 printf %q(它的反斜杠转义 PS 不认)
   {
-    printf 'ENABLED=%q\n' "$ENABLED"
-    printf 'BASE_URL=%q\n' "$BASE_URL"
-    printf 'MODEL=%q\n' "$MODEL"
-    printf 'WIRE_API=%q\n' "$WIRE_API"
-    printf 'SANDBOX_DEFAULT=%q\n' "$SANDBOX_DEFAULT"
-    printf 'TIMEOUT_DEFAULT=%q\n' "$TIMEOUT_DEFAULT"
-    printf 'LEVEL=%q\n' "$LEVEL"
+    printf 'ENABLED=%s\n' "$ENABLED"
+    printf 'BASE_URL=%s\n' "$BASE_URL"
+    printf 'MODEL=%s\n' "$MODEL"
+    printf 'WIRE_API=%s\n' "$WIRE_API"
+    printf 'SANDBOX_DEFAULT=%s\n' "$SANDBOX_DEFAULT"
+    printf 'TIMEOUT_DEFAULT=%s\n' "$TIMEOUT_DEFAULT"
+    printf 'LEVEL=%s\n' "$LEVEL"
   } > "$CFG_FILE"
   chmod 600 "$CFG_FILE"
 }
@@ -50,8 +55,14 @@ case "$cmd" in
     echo "codex-offload: 已关闭 (OFF)"
     ;;
   set)
-    key="${1:?用法: ctl.sh set <base_url|model|wire_api|sandbox|timeout> <值>}"
+    key="${1:?用法: ctl.sh set <base_url|model|wire_api|sandbox|timeout|level> <值>}"
     val="${2:?缺少值}"
+    # 值禁止空白/引号/shell 元字符(与 ctl.ps1 的 Save-Config 黑名单一致):
+    # config 会被 bash source(纯 KEY=value 不带引号),也要能被 PowerShell 按字面读取
+    case "$val" in
+      *[[:space:]\'\"\`\$\;\&\|\<\>\(\)\\]*)
+        echo "值不能包含空格/引号等特殊 shell 字符: $val" >&2; exit 1 ;;
+    esac
     case "$key" in
       base_url) BASE_URL="$val" ;;
       model)    MODEL="$val" ;;
@@ -82,7 +93,7 @@ case "$cmd" in
         echo "禁止用 set 传密钥(会留在会话记录里)。请用: ctl.sh set-token (从 stdin 读入)" >&2
         exit 1 ;;
       *)
-        echo "未知配置项: $key (支持 base_url|model|wire_api|sandbox|timeout)" >&2
+        echo "未知配置项: $key (支持 base_url|model|wire_api|sandbox|timeout|level)" >&2
         exit 1 ;;
     esac
     save
@@ -110,33 +121,42 @@ case "$cmd" in
   models)
     [ -n "$BASE_URL" ] || { echo "先配置 base_url (ctl.sh set base_url <url>)" >&2; exit 1; }
     [ -f "$TOKEN_FILE" ] || { echo "先配置 token ($TOKEN_FILE)" >&2; exit 1; }
-    python3 - "$BASE_URL" "$TOKEN_FILE" <<'PY'
-import json, sys, urllib.request, urllib.error
-
-base, token_file = sys.argv[1].rstrip("/"), sys.argv[2]
-with open(token_file) as f:
-    token = f.read().strip()
-req = urllib.request.Request(base + "/models",
-                             headers={"Authorization": "Bearer " + token})
+    command -v curl >/dev/null 2>&1 || { echo "需要 curl (macOS/Linux/Windows10+ 均自带)" >&2; exit 1; }
+    # token 通过 stdin 的 curl 配置传入,不上命令行参数
+    if ! resp="$(printf 'header = "Authorization: Bearer %s"\n' "$(tr -d '\r\n' < "$TOKEN_FILE")" \
+        | curl -sS --max-time 20 -K - -w '\n%{http_code}' "${BASE_URL%/}/models" 2>&1)"; then
+      echo "获取模型列表失败: $resp" >&2
+      exit 1
+    fi
+    code="${resp##*$'\n'}"
+    body="${resp%$'\n'*}"
+    case "$code" in
+      2[0-9][0-9]) ;;
+      *) echo "获取模型列表失败: HTTP $code" >&2; exit 1 ;;
+    esac
+    ids=""
+    # 优先 python3 精确解析;没有 python3(如 Git Bash)则用 grep/sed 粗解析回退
+    if command -v python3 >/dev/null 2>&1; then
+      ids="$(printf '%s' "$body" | python3 -c '
+import json, sys
 try:
-    with urllib.request.urlopen(req, timeout=20) as r:
-        data = json.load(r)
-except urllib.error.HTTPError as e:
-    print(f"获取模型列表失败: HTTP {e.code} {e.reason}", file=sys.stderr)
+    data = json.load(sys.stdin)
+except Exception:
     sys.exit(1)
-except Exception as e:
-    print(f"获取模型列表失败: {e}", file=sys.stderr)
-    sys.exit(1)
-
 items = data.get("data") if isinstance(data, dict) else data
 if not isinstance(items, list):
     items = []
 ids = sorted({m.get("id") for m in items if isinstance(m, dict) and m.get("id")})
-if not ids:
-    print("接口没有返回模型列表(中转商可能不支持 /models 端点)", file=sys.stderr)
-    sys.exit(1)
-print("\n".join(ids))
-PY
+print("\n".join(ids))' 2>/dev/null)" || ids=""
+    fi
+    if [ -z "$ids" ]; then
+      ids="$(printf '%s' "$body" \
+        | grep -o '"id"[[:space:]]*:[[:space:]]*"[^"]*"' \
+        | sed -E 's/^"id"[[:space:]]*:[[:space:]]*"(.*)"$/\1/' \
+        | sort -u)"
+    fi
+    [ -n "$ids" ] || { echo "接口没有返回模型列表(中转商可能不支持 /models 端点)" >&2; exit 1; }
+    printf '%s\n' "$ids"
     ;;
   status)
     if [ "${ENABLED:-0}" = "1" ]; then sw="ON"; else sw="OFF"; fi

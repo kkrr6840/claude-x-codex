@@ -13,6 +13,12 @@ description: codex 分流决策规则——分流开启时，判断哪些子任�
 bash "${CLAUDE_PLUGIN_ROOT}/scripts/codex-run.sh" [--cd <工作目录>] [--sandbox workspace-write] [--timeout <秒>] '<自包含任务描述>'
 ```
 
+无 Git Bash 的 Windows（只有 PowerShell 工具）用孪生脚本，行为一致：
+
+```
+& "${CLAUDE_PLUGIN_ROOT}/scripts/codex-run.ps1" [-Cd <工作目录>] [-Sandbox workspace-write] [-TimeoutSec <秒>] '<自包含任务描述>'
+```
+
 - stdout 即 codex 的最终结论；非 0 退出码表示失败，stderr 有日志尾部。
 - 默认只读沙箱（read-only），写文件必须显式 `--sandbox workspace-write`。
 - 预计超过 1 分钟的任务用后台 Bash（run_in_background）；多个独立任务并行发。
