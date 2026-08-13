@@ -1,0 +1,12 @@
+{
+  "name": "codex-offload",
+  "version": "0.1.0",
+  "displayName": "Codex Offload",
+  "description": "把自包含子任务分流给本地 codex CLI（第三方中转商）执行，节省 Claude token",
+  "author": {
+    "name": "kkrr6840"
+  },
+  "repository": "https://github.com/kkrr6840/claude-x-codex",
+  "license": "MIT",
+  "keywords": ["codex", "offload", "token", "relay"]
+}

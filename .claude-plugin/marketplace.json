@@ -1,0 +1,14 @@
+{
+  "name": "claude-x-codex",
+  "description": "codex-offload 插件的自托管市场：把子任务分流给本地 codex CLI 以节省 Claude token",
+  "owner": {
+    "name": "kkrr6840"
+  },
+  "plugins": [
+    {
+      "name": "codex-offload",
+      "source": "./",
+      "description": "把自包含子任务分流给本地 codex CLI（第三方中转商）执行，节省 Claude token"
+    }
+  ]
+}
