@@ -36,4 +36,7 @@ $ARGUMENTS 为空时，逐步引导用户完成配置（顺序有讲究：先配
    - 失败（如中转商不支持 /models）：告知原因，回退为自由输入。
 5. **level**：用 AskUserQuestion 二选一——balanced（默认：只分流搜索/分析/调研类子任务，质量优先）或 high（激进：能分流的一律分流含主线编码，省 token 优先）。
 6. wire_api / sandbox / timeout 是高级项，不主动问，用户提到才设。
-7. 收尾：运行 `ctl.sh status` 展示最终配置；问用户是否现在开启分流（是则运行 `ctl.sh enable`）并建议跑 /codex-offload:test 验证连通性。
+7. 收尾：运行 `ctl.sh status` 展示最终配置；问用户是否现在开启分流。用户同意则运行 `ctl.sh enable`，**然后必须立即在本会话激活分流行为——只翻开关不激活，会造成"status 显示 ON 但行为完全不变"的假开启（本插件出过的真实事故）**。激活即从现在起按所配强度执行：
+   - balanced：自包含、不依赖本会话上下文的子任务（跨文件搜索/分析审计/资料调研/独立机械修改/一次性脚本）分流给 codex，替代 Explore/general-purpose subagent；
+   - high：只要任务能写成自包含描述、shell/文件级操作能完成（含主线编码），一律分流，你负责拆解、下发、复核、整合。
+   分流入口是本插件 scripts/ 下的 codex-run.sh（无 Bash 工具的 Windows 用 codex-run.ps1），首次分流前先读本插件的 codex-offload skill。最后建议跑 /codex-offload:test 验证连通性，并提醒用户：其他已经开着的会话需要各自执行 /codex-offload:on 才会生效（新会话由 SessionStart hook 自动生效）。

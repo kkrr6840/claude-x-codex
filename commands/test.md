@@ -14,5 +14,5 @@ allowed-tools: Bash
   2. `404` / `not found` → base_url 路径不对，试试补上或去掉末尾的 `/v1`（用 /codex-offload:config 改）；
   3. 报 `wire_api = "chat" is no longer supported` → 新版 codex 只支持 Responses API，运行 `ctl.sh set wire_api responses` 后重测；若报 `/responses` 路径 404/400 → 中转商不支持 Responses API，告知用户需换支持 `/v1/responses` 的中转商，或降级 codex 版本；
   4. 模型名相关错误 → `ctl.sh set model <中转商支持的模型名>`；
-  5. `分流未开启` → 先运行 /codex-offload:on。
+  5. `分流未开启` → 让用户执行 /codex-offload:on 开启。**不要图省事直接调 ctl 脚本的 enable**——那只改配置文件，不会把分流规则注入当前会话，会造成"开关 ON 但行为不变"的假开启。
 - 失败时**最多按建议调整重试 2 次**，仍失败就把完整信息交还用户判断，不要继续盲试。
