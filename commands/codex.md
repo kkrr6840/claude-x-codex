@@ -1,7 +1,7 @@
 ---
 description: 手动把一个任务分流给 codex 执行
 argument-hint: "<自包含任务描述>"
-allowed-tools: Bash
+allowed-tools: Bash, PowerShell
 ---
 
 用户要求把以下任务分流给 codex 执行：

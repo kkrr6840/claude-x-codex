@@ -1,6 +1,6 @@
 ---
 description: 关闭 codex 分流（当前会话与新会话都停止分流）
-allowed-tools: Bash
+allowed-tools: Bash, PowerShell
 ---
 
 第一步，执行开关脚本（按本环境可用的工具二选一）：

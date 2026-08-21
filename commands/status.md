@@ -1,6 +1,6 @@
 ---
 description: 查看 codex 分流的开关状态与配置
-allowed-tools: Bash
+allowed-tools: Bash, PowerShell
 ---
 
 执行状态脚本（按本环境可用的工具二选一）：

@@ -1,6 +1,6 @@
 ---
 description: 用最小任务验证中转商连通性（base_url / token / wire_api / model）
-allowed-tools: Bash
+allowed-tools: Bash, PowerShell
 ---
 
 运行连通性自检（工具的 timeout 参数给到 180000 毫秒，自检可能需要 1-2 分钟）：

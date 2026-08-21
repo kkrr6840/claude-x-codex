@@ -1,6 +1,6 @@
 ---
 description: 开启 codex 分流（当前会话立即生效，新会话自动生效）
-allowed-tools: Bash
+allowed-tools: Bash, PowerShell
 ---
 
 第一步，执行开关脚本（按本环境可用的工具二选一）：
